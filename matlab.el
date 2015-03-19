@@ -573,14 +573,14 @@ If font lock is not loaded, lay in wait."
                       'matlab-unterminated-string-face))
           (t
            (make-face 'matlab-unterminated-string-face)))
-    (matlab-set-face-underline 'matlab-unterminated-string-face t)
+    (set-face-underline-p 'matlab-unterminated-string-face t)
 
     ;; Now make some simulink faces
     (cond ((facep 'font-lock-type-face)
            (copy-face 'font-lock-type-face 'matlab-simulink-keyword-face))
           (t
            (make-face 'matlab-simulink-keyword-face)))
-    (matlab-set-face-underline 'matlab-simulink-keyword-face t)
+    (set-face-underline-p 'matlab-simulink-keyword-face t)
 
     ;; Now make some nested function/end keyword faces
     (cond ((facep 'font-lock-type-face)
@@ -4500,6 +4500,7 @@ Try C-h f matlab-shell RET"))
                  (file :tag "File" "")))
 
 
+
 (defun matlab-shell-hack-logo (str)
   "Replace the text logo with a real logo.
 STR is passed from the commint filter."
@@ -4884,27 +4885,27 @@ FILE is ignored, and ARGS is returned."
 
     (when (not frame)
       (when (string-match gud-matlab-marker-regexp-1 gud-marker-acc)
-        (when (not frame)
-          ;; If there is a debug prompt, and no frame currently set,
-          ;; go find one.
-          (let ((url gud-marker-acc)
-                ef el)
-            (cond
-             ((string-match "^error:\\(.*\\),\\([0-9]+\\),\\([0-9]+\\)$" url)
-              (setq ef (substring url (match-beginning 1) (match-end 1))
-                    el (substring url (match-beginning 2) (match-end 2)))
-              )
-             ((string-match "opentoline('\\([^']+\\)',\\([0-9]+\\),\\([0-9]+\\))" url)
-              (setq ef (substring url (match-beginning 1) (match-end 1))
-                    el (substring url (match-beginning 2) (match-end 2)))
-              )
-             ;; If we have the prompt, but no match (as above),
-             ;; perhaps it is already dumped out into the buffer.  In
-             ;; that case, look back through the buffer.
+    (when (not frame)
+      ;; If there is a debug prompt, and no frame currently set,
+      ;; go find one.
+      (let ((url gud-marker-acc)
+        ef el)
+        (cond
+         ((string-match "^error:\\(.*\\),\\([0-9]+\\),\\([0-9]+\\)$" url)
+          (setq ef (substring url (match-beginning 1) (match-end 1))
+            el (substring url (match-beginning 2) (match-end 2)))
+          )
+         ((string-match "opentoline('\\([^']+\\)',\\([0-9]+\\),\\([0-9]+\\))" url)
+          (setq ef (substring url (match-beginning 1) (match-end 1))
+            el (substring url (match-beginning 2) (match-end 2)))
+          )
+         ;; If we have the prompt, but no match (as above),
+         ;; perhaps it is already dumped out into the buffer.  In
+         ;; that case, look back through the buffer.
 
-             )
-            (when ef
-              (setq frame (cons ef (string-to-number el)))))))
+         )
+        (when ef
+          (setq frame (cons ef (string-to-number el)))))))
       )
     ;; This if makes sure that the entirety of an error output is brought in
     ;; so that matlab-shell-mode doesn't try to display a file that only partially
@@ -5099,12 +5100,12 @@ Returns a string path to the root of the executing MATLAB."
           matlab-shell-matlabroot-run
         ;; If we haven't cached it, calculate it now.
 
-        (if (not (matlab-on-prompt-p))
-            (error "MATLAB shell must be non-busy to do that"))
-        (setq output (matlab-shell-collect-command-output cmd))
+    (if (not (matlab-on-prompt-p))
+        (error "MATLAB shell must be non-busy to do that"))
+    (setq output (matlab-shell-collect-command-output cmd))
 
-        (string-match "$" output)
-        (substring output 0 (match-beginning 0))))))
+    (string-match "$" output)
+    (substring output 0 (match-beginning 0))))))
 
 (defvar matlab-shell-window-exists-for-display-completion-flag nil
   "Non-nil means there was an 'other-window' available when `display-completion-list' is called.")
@@ -5528,9 +5529,9 @@ This command requires an active MATLAB shell."
 pIf region is not active run the current line.
 This command requires an active MATLAB shell."
   (interactive)
-  (if (and transient-mark-mode mark-active)
-      (matlab-shell-run-region (mark) (point))
-    (matlab-shell-run-region (matlab-point-at-bol) (matlab-point-at-eol))))
+ (if (and transient-mark-mode mark-active)
+     (matlab-shell-run-region (mark) (point))
+   (matlab-shell-run-region (matlab-point-at-bol) (matlab-point-at-eol))))
 
 
 ;;; MATLAB Shell Commands =====================================================
@@ -5775,9 +5776,9 @@ show up in reverse order."
                   (setq p (matlab-previous-overlay-change p))
                   (not (eq p (point-min))))
         (setq url
-              (if stacktop
-                  (matlab-url-stack-top-at p)
-                (matlab-url-at p))))
+          (if stacktop
+          (matlab-url-stack-top-at p)
+        (matlab-url-at p))))
       url)))
 
 (defun matlab-find-other-window-file-line-column (ef el ec &optional debug)
