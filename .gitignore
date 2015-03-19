@@ -1,8 +1,6 @@
-# -*-conf-*-
-
-*.elc
-*~
-\#*\#
-
-# matlab-load.el is generated
-matlab-load.el
+*-compile-script
+bugs
+*.patch
+*.diff
+semantic.cache
+MISC
