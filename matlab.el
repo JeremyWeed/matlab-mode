@@ -5662,6 +5662,19 @@ This uses the lookfor command to find viable commands."
       (beginning-of-line)
       (looking-at (concat comint-prompt-regexp "\\s-*$")))))
 
+(defun matlab-on-double-empty-prompt-p ()
+  "Return t if we MATLAB is on an empty prompt and there is another empty prompt above."
+  (save-excursion
+    (let ((inhibit-field-text-motion t))
+      (goto-char (point-max))
+      (beginning-of-line)
+      (and (looking-at (concat comint-prompt-regexp "\\s-*$"))
+           (progn
+             (forward-line -1)
+             (beginning-of-line)
+             (looking-at (concat comint-prompt-regexp "\\s-*$")))))))
+
+
 (defun matlab-shell-buffer-barf-not-running ()
   "Return a running MATLAB buffer iff it is currently active."
   (or (matlab-shell-active-p)
@@ -5672,73 +5685,51 @@ This uses the lookfor command to find viable commands."
 It's output is returned as a string with no face properties.  The text output
 of the command is removed from the MATLAB buffer so there will be no
 indication that it ran."
-  (let ((msbn (matlab-shell-buffer-barf-not-running)))
-    ;; We are unable to use save-excursion to save point position because we are
-    ;; manipulating the *MATLAB* buffer by erasing the current text typed at the
-    ;; MATLAB prompt (where point is) and then we send command to MATLAB and
-    ;; grab the result. After this we erase the output from command and then
-    ;; restore the current text at the MATLAB prompt and move to start-point.
-    ;; Note, save-excursion works by tracking `point-marker' and when you manipulate
-    ;; the text at point, `point-marker' moves causing save-excursion to move
-    ;; the point in to a location we don't want. See:
-    ;; http://emacs.stackexchange.com/questions/7574/why-save-excursion-doesnt-save-point-position
-    ;; Ideally there would be some way to prevent the *MATLAB* buffer from refreshing
-    ;; as we are interacting with it, but I couldn't figure out a way to do that.
-    (with-current-buffer msbn
-      (save-window-excursion
-        (let ((pos nil)
-              (str nil)
-              (lastcmd)
-              (inhibit-field-text-motion t)
-              (start-point (point)))
-          (if (not (matlab-on-prompt-p))
-              (error "MATLAB shell must be non-busy to do that"))
-
-          ;; Save the old command
-          (goto-char (point-max))
-          (beginning-of-line)
-          (re-search-forward comint-prompt-regexp)
-          ;; Backup if there are extra spaces. To see why, try tab completion on command with
-          ;; leading spaces, e.g.
-          ;; >> h=figure;
-          ;; >>                    h.Num<TAB>
-          (re-search-backward ">")
-          (forward-char 2)
-          (setq lastcmd (buffer-substring (point) (matlab-point-at-eol)))
-          (delete-region (point) (matlab-point-at-eol))
-          ;; We are done error checking, run the command.
-          (setq pos (point))
-          ;; Note, comint-simple-send in emacs 24.4 appends a newline and code below assumes
-          ;; one prompt indicates command completed, so don't append a newline.
-          (comint-simple-send (get-buffer-process (current-buffer)) command)
-          ;; Wait for the command to finish, by looking for new prompt.
-          (goto-char (point-max))
-          ;; Turn on C-g by using wiht-local-quit. This is needed to prevent message:
-          ;;  "Blocking call to accept-process-output with quit inhibited!! [115 times]"
-          ;; when using `company-matlab-shell' for TAB completions.
-          (with-local-quit
-            (while (or (>= (+ pos (string-width command)) (point)) (not (matlab-on-empty-prompt-p)))
-              (accept-process-output (get-buffer-process (current-buffer)))
-              (goto-char (point-max))))
-
-          ;; Get result of command into str
-          (goto-char pos)
-          (setq str (buffer-substring-no-properties (save-excursion
-                                                      (goto-char pos)
-                                                      (beginning-of-line)
-                                                      (forward-line 1)
-                                                      (point))
-                                                    (save-excursion
-                                                      (goto-char (point-max))
-                                                      (beginning-of-line)
-                                                      (point))))
-          ;; delete the result of command
-          (delete-region pos (point-max))
-          ;; restore contents of buffer so it looks like nothing happened.
-          (insert lastcmd)
-          (goto-char start-point)
-          ;; return result 'string' from executing MATLAB command
-          str)))))
+  (let ((msbn (matlab-shell-buffer-barf-not-running))
+        (pos1 nil)
+        (pos2 nil)
+        (str nil)
+        (lastcmd)
+        (inhibit-field-text-motion t))
+    (save-excursion
+      (set-buffer msbn)
+      (if (not (matlab-on-prompt-p))
+          (error "MATLAB shell must be non-busy to do that"))
+      ;; Save the old command
+      (goto-char (point-max))
+      (beginning-of-line)
+      (setq pos1 (point))
+      (re-search-forward comint-prompt-regexp)
+      (setq pos2 (point))
+      (setq lastcmd (buffer-substring (point) (matlab-point-at-eol)))
+      (delete-region (point) (matlab-point-at-eol))
+      ;; We are done error checking, run the command.
+      (comint-simple-send (get-buffer-process (current-buffer))
+                          (concat command "\n"))
+      ;;(message "MATLAB ... Executing command.")
+      (goto-char (point-max))
+      ;; We wait for double prompt since that's the respond we actually get
+      (while (or (>= pos2 (point)) (not (matlab-on-double-empty-prompt-p)))
+        (accept-process-output (get-buffer-process (current-buffer)))
+        (goto-char (point-max))
+        ;;(message "MATLAB reading...")
+        )
+      ;;(message "MATLAB reading...done")
+      (setq str (buffer-substring-no-properties (save-excursion
+                                                  (goto-char pos1)
+                                                  (beginning-of-line)
+                                                  (forward-line 1)
+                                                  (point))
+                                                (save-excursion
+                                                  (goto-char (point-max))
+                                                  (beginning-of-line)
+                                                  (point))))
+      (save-excursion
+        (goto-char (point-max))
+        (beginning-of-line)
+        (delete-region pos1 (point)))
+      (insert lastcmd))
+    str))
 
 (defun matlab-shell-send-string (string)
   "Send STRING to the currently running matlab process."
