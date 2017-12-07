@@ -1,4 +1,4 @@
-;;; flycheck-mlint.el --- Flycheck checker using Matlab mlint
+;;; flycheck-matlab-mlint.el --- Flycheck checker using Matlab mlint
 
 ;; Copyright (C) 2015 Andrzej Pronobis
 ;; Author: Andrzej Pronobis <a.pronobis@gmail.com>
