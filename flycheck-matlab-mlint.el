@@ -72,7 +72,7 @@
 
 (flycheck-define-command-checker 'matlab-mlint
   "A Matlab checker based on mlint."
-  :command (flycheck-matlab-mlint-executable-path source)
+  :command (,flycheck-matlab-mlint-executable-path source)
   :error-patterns
   '((warning line-start "L " line " (C " (1+ digit)  "): " (message) line-end))
   :modes matlab-mode)
