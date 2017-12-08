@@ -26,9 +26,7 @@
 ;;   '(require 'flycheck-matlab-mlint))
 
 ;;; Code:
-(condition-case nil
-	(require 'flycheck)
-  (debug error nil))
+(require 'flycheck)
 
 ;; Taken from mlint.el by Eric M. Ludlam
 (defvar flycheck-matlab-mlint-platform
