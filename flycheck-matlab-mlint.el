@@ -26,6 +26,7 @@
 ;;   '(require 'flycheck-matlab-mlint))
 
 ;;; Code:
+(require 'matlab)
 (require 'flycheck)
 
 ;; Taken from mlint.el by Eric M. Ludlam
