@@ -2,6 +2,7 @@
 
 ;; Copyright (C) 2015 Andrzej Pronobis
 ;; Author: Andrzej Pronobis <a.pronobis@gmail.com>
+;; Package-Requires: ((flycheck "0.22"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -26,9 +27,6 @@
 ;;   '(require 'flycheck-matlab-mlint))
 
 ;;; Code:
-
-(eval-when-compile
-  (require 'flycheck))
 
 (require 'flycheck)
 
