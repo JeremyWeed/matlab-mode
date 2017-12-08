@@ -27,44 +27,47 @@
 
 ;;; Code:
 
+(eval-when-compile
+  (require 'flycheck))
+
 (require 'flycheck)
 
 ;; Taken from mlint.el by Eric M. Ludlam
 (defvar flycheck-matlab-mlint-platform
   (cond ((eq system-type 'darwin)
-         (if (string-match "i386" system-configuration)
-             (let ((mt (getenv "MACHTYPE")))
-               (if (and (stringp mt) (string= "x86_32" mt))
-                   ;; This hack is bad since an Emacs started from
-                   ;; the doc doesn't have this variable, thus by defaulting
-                   ;; to checking the 32 bit (not common anymore) version,
-                   ;; we'll get the right answer most of the time.
-                   "maci" "maci64"))
-           "mac"))
-        ((eq system-type 'gnu/linux)
-         (cond ((string-match "64\\|i686" system-configuration)
-                "glnxa64")
-               (t "glnx86")))
-        ((eq system-type 'solaris)
-         "sol2")
-        ((eq system-type 'hpux)
-         "hpux")
-        ((eq system-type 'windows-nt)
-         ;; Thought about checking the env PROCESSOR_ARCHITEW6432,
-         ;; but this said AMD on my Intel, which seemed suspicious.
-         (let ((proc (getenv "PROCESSOR_IDENTIFIER")))
-           (if (and (stringp proc) (string-match "64" proc))
-               "win64"
-             "win32")))
-        (t "unknown"))
+		 (if (string-match "i386" system-configuration)
+			 (let ((mt (getenv "MACHTYPE")))
+			   (if (and (stringp mt) (string= "x86_32" mt))
+				   ;; This hack is bad since an Emacs started from
+				   ;; the doc doesn't have this variable, thus by defaulting
+				   ;; to checking the 32 bit (not common anymore) version,
+				   ;; we'll get the right answer most of the time.
+				   "maci" "maci64"))
+		   "mac"))
+		((eq system-type 'gnu/linux)
+		 (cond ((string-match "64\\|i686" system-configuration)
+				"glnxa64")
+			   (t "glnx86")))
+		((eq system-type 'solaris)
+		 "sol2")
+		((eq system-type 'hpux)
+		 "hpux")
+		((eq system-type 'windows-nt)
+		 ;; Thought about checking the env PROCESSOR_ARCHITEW6432,
+		 ;; but this said AMD on my Intel, which seemed suspicious.
+		 (let ((proc (getenv "PROCESSOR_IDENTIFIER")))
+		   (if (and (stringp proc) (string-match "64" proc))
+			   "win64"
+			 "win32")))
+		(t "unknown"))
   "Platform we are running mlint on.")
 
 (defvar flycheck-matlab-mlint-executable-path
   (or (executable-find
-       (concat
-        (file-name-as-directory flycheck-matlab-mlint-platform)
-        "mlint"))
-      "")
+	   (concat
+		(file-name-as-directory flycheck-matlab-mlint-platform)
+		"mlint"))
+	  "")
   "Default full executable path.")
 
 (flycheck-def-executable-var matlab-mlint "<platform>/mlint")
