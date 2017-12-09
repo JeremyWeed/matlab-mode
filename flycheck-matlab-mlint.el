@@ -77,7 +77,7 @@
   '((warning line-start "L " line " (C " (1+ digit)  "): " (message) line-end))
   :modes '(matlab-mode))
 
-;; (add-to-list 'flycheck-checkers 'matlab-mlint 'append)
+(add-to-list 'flycheck-checkers 'matlab-mlint 'append)
 
 (provide 'flycheck-matlab-mlint)
 ;;; flycheck-matlab-mlint.el ends here
