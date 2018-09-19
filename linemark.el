@@ -43,24 +43,24 @@
 (eval-and-compile
   (if (featurep 'xemacs)
       (progn
-	(defalias 'linemark-overlay-live-p 'extent-live-p)
-	(defalias 'linemark-make-overlay 'make-extent)
-	(defalias 'linemark-overlay-put 'set-extent-property)
-	(defalias 'linemark-overlay-get 'extent-property)
-	(defalias 'linemark-delete-overlay 'delete-extent)
-	(defalias 'linemark-overlays-at
-	  (lambda (pos) (extent-list nil pos pos)))
-	(defalias 'linemark-overlays-in 
-	  (lambda (beg end) (extent-list nil beg end)))
-	(defalias 'linemark-overlay-buffer 'extent-buffer)
-	(defalias 'linemark-overlay-start 'extent-start-position)
-	(defalias 'linemark-overlay-end 'extent-end-position)
-	(defalias 'linemark-next-overlay-change 'next-extent-change)
-	(defalias 'linemark-previous-overlay-change 'previous-extent-change)
-	(defalias 'linemark-overlay-lists
-	  (lambda () (list (extent-list))))
-	(defalias 'linemark-overlay-p 'extentp)
-	)
+        (defalias 'linemark-overlay-live-p 'extent-live-p)
+        (defalias 'linemark-make-overlay 'make-extent)
+        (defalias 'linemark-overlay-put 'set-extent-property)
+        (defalias 'linemark-overlay-get 'extent-property)
+        (defalias 'linemark-delete-overlay 'delete-extent)
+        (defalias 'linemark-overlays-at
+          (lambda (pos) (extent-list nil pos pos)))
+        (defalias 'linemark-overlays-in
+          (lambda (beg end) (extent-list nil beg end)))
+        (defalias 'linemark-overlay-buffer 'extent-buffer)
+        (defalias 'linemark-overlay-start 'extent-start-position)
+        (defalias 'linemark-overlay-end 'extent-end-position)
+        (defalias 'linemark-next-overlay-change 'next-extent-change)
+        (defalias 'linemark-previous-overlay-change 'previous-extent-change)
+        (defalias 'linemark-overlay-lists
+          (lambda () (list (extent-list))))
+        (defalias 'linemark-overlay-p 'extentp)
+        )
     (defalias 'linemark-overlay-live-p 'overlay-buffer)
     (defalias 'linemark-make-overlay 'make-overlay)
     (defalias 'linemark-overlay-put 'overlay-put)
@@ -77,6 +77,14 @@
     (defalias 'linemark-overlay-p 'overlayp)
     ))
 
+(eval-and-compile
+  ;; `object-name-string' is an obsolete function (as of 24.4); use `eieio-object-name-string' instead.
+  (cond ((fboundp 'eieio-object-name-string)
+         (defalias 'linemark-object-name-string 'eieio-object-name-string))
+        (t
+         (defalias 'linemark-object-name-string 'object-name-string)))
+  )
+
 (defgroup linemark nil
   "Line marking/highlighting."
   :group 'tools
@@ -87,30 +95,30 @@
   ;; entries in the classes defined below.
 
 (defface linemark-stop-face '((((class color) (background light))
-			       (:background "#ff8888"))
-			      (((class color) (background dark))
-			       (:background "red3")))
+                   (:background "#ff8888"))
+                  (((class color) (background dark))
+                   (:background "red3")))
   "*Face used to indicate a STOP type line."
   :group 'linemark)
 
 (defface linemark-caution-face '((((class color) (background light))
-				  (:background "yellow"))
-				 (((class color) (background dark))
-				  (:background "yellow4")))
+                  (:background "yellow"))
+                 (((class color) (background dark))
+                  (:background "yellow4")))
   "*Face used to indicate a CAUTION type line."
   :group 'linemark)
-				  
+
 (defface linemark-go-face '((((class color) (background light))
-			     (:background "#88ff88"))
-			    (((class color) (background dark))
-			     (:background "green4")))
+                 (:background "#88ff88"))
+                (((class color) (background dark))
+                 (:background "green4")))
   "*Face used to indicate a GO, or OK type line."
   :group 'linemark)
 
 (defface linemark-funny-face '((((class color) (background light))
-				(:background "cyan"))
-			       (((class color) (background dark))
-				(:background "blue3")))
+                (:background "cyan"))
+                   (((class color) (background dark))
+                (:background "blue3")))
   "*Face used for elements with no particular criticality."
   :group 'linemark)
 
@@ -118,38 +126,38 @@
 
 (defclass linemark-entry ()
   ((filename :initarg :filename
-	     :type string
-	     :documentation "File name for this mark.")
+         :type string
+         :documentation "File name for this mark.")
    (line     :initarg :line
-	     :type number
-	     :documentation "Line number where the mark is.")
+         :type number
+         :documentation "Line number where the mark is.")
    (face     :initarg :face
 ; Something created w/ defface is not a face in XEmacs.
-;	     :type face
-	     :initform linemark-caution-face
-	     :documentation "The face to use for display.")
+;        :type face
+         :initform linemark-caution-face
+         :documentation "The face to use for display.")
    (parent   :documentation "The parent `linemark-group' containing this."
-	     :type linemark-group)
+         :type linemark-group)
    (overlay  :documentation "Overlay created to show this mark."
-	     :type (or linemark-overlay null)
-	     :initform nil
-	     :protection protected))
+         :type (or linemark-overlay null)
+         :initform nil
+         :protection protected))
   "Track a file/line associations with overlays used for display.")
 
 (defclass linemark-group ()
   ((marks :initarg :marks
-	  :type list
-	  :initform nil
-	  :documentation "List of `linemark-entries'.")
+      :type list
+      :initform nil
+      :documentation "List of `linemark-entries'.")
    (face :initarg :face
-	 :initform linemark-funny-face
+     :initform linemark-funny-face
 ; Something created w/ defface is not a face in XEmacs.
-;	 :type (or null face)
-	 :documentation "Default face used to create new `linemark-entries'.")
+;    :type (or null face)
+     :documentation "Default face used to create new `linemark-entries'.")
    (active :initarg :active
-	   :type boolean
-	   :initform t
-	   :documentation "Track if these marks are active or not."))
+       :type boolean
+       :initform t
+       :documentation "Track if these marks are active or not."))
   "Track a common group of `linemark-entries'.")
 
 ;;; Functions
@@ -170,17 +178,17 @@ Optional argument DEFAULTFACE is the :face slot for the object."
 Give this group NAME.  ARGS are slot/value pairs for
 the new instantiation."
   (let ((newgroup nil)
-	(foundgroup nil)
-	(lmg linemark-groups))
+        (foundgroup nil)
+        (lmg linemark-groups))
     ;; Find an old group.
     (while (and (not foundgroup) lmg)
-      (if (string= name (object-name-string (car lmg)))
-	  (setq foundgroup (car lmg)))
+      (if (string= name (linemark-object-name-string (car lmg)))
+          (setq foundgroup (car lmg)))
       (setq lmg (cdr lmg)))
     ;; Which group to use.
     (if foundgroup
-	;; Recycle the old group
-	(setq newgroup foundgroup)
+        ;; Recycle the old group
+        (setq newgroup foundgroup)
       ;; Create a new group
       (setq newgroup (apply 'make-instance class name args))
       (setq linemark-groups (cons newgroup linemark-groups)))
@@ -193,16 +201,16 @@ Optional POS is the position to check which defaults to point.
 If GROUP, then make sure it also belongs to GROUP."
   (if (not pos) (setq pos (point)))
   (let ((o (linemark-overlays-at pos))
-	(found nil))
+    (found nil))
     (while (and o (not found))
       (let ((og (linemark-overlay-get (car o) 'obj)))
-	(if (and og (linemark-entry-child-p og))
-	    (progn
-	      (setq found og)
-	      (if group
-		  (if (not (eq group (oref found parent)))
-		      (setq found nil)))))
-	(setq o (cdr o))))
+    (if (and og (linemark-entry-child-p og))
+        (progn
+          (setq found og)
+          (if group
+          (if (not (eq group (oref found parent)))
+              (setq found nil)))))
+    (setq o (cdr o))))
     found))
 
 (defun linemark-next-in-buffer (group &optional arg wrap)
@@ -212,32 +220,32 @@ Optional WRAP argument indicates that we should wrap around the end of
 the buffer."
   (if (not arg) (setq arg 1)) ;; default is one forward
   (let* ((entry (linemark-at-point (point) group))
-	 (nc (if entry
-		 (if (< 0 arg) (linemark-end entry)
-		   (linemark-begin entry))
-	       (point)))
-	 (dir (if (< 0 arg) 1 -1))
-	 (ofun (if (> 0 arg)
-		   'linemark-previous-overlay-change
-		 'linemark-next-overlay-change))
-	 (bounds (if (< 0 arg) (point-min) (point-max)))
-	 )
+     (nc (if entry
+         (if (< 0 arg) (linemark-end entry)
+           (linemark-begin entry))
+           (point)))
+     (dir (if (< 0 arg) 1 -1))
+     (ofun (if (> 0 arg)
+           'linemark-previous-overlay-change
+         'linemark-next-overlay-change))
+     (bounds (if (< 0 arg) (point-min) (point-max)))
+     )
     (setq entry nil)
     (catch 'moose
       (save-excursion
-	(while (and (not entry) (/= arg 0))
-	  (setq nc (funcall ofun nc))
-	  (setq entry (linemark-at-point nc group))
-	  (if (not entry)
-	      (if (or (= nc (point-min)) (= nc (point-max)))
-		  (if (not wrap)
-		      (throw 'moose t)
-		    (setq wrap nil ;; only wrap once
-			  nc bounds))))
-	  ;; Ok, now decrement arg, and keep going.
-	  (if entry
-	      (setq arg (- arg dir)
-		    nc (linemark-end entry))))))
+    (while (and (not entry) (/= arg 0))
+      (setq nc (funcall ofun nc))
+      (setq entry (linemark-at-point nc group))
+      (if (not entry)
+          (if (or (= nc (point-min)) (= nc (point-max)))
+          (if (not wrap)
+              (throw 'moose t)
+            (setq wrap nil ;; only wrap once
+              nc bounds))))
+      ;; Ok, now decrement arg, and keep going.
+      (if entry
+          (setq arg (- arg dir)
+            nc (linemark-end entry))))))
     entry))
 
 ;;; Methods that make things go
@@ -248,8 +256,8 @@ It will be at location specified by :filename and :line, and :face
 which are property list entries in ARGS.
 Call the new entrie's activate method."
   (let ((file (plist-get args :filename))
-	(line (plist-get args :line))
-	(face (plist-get args :face)))
+    (line (plist-get args :line))
+    (face (plist-get args :face)))
     (if (not file)
         (progn
           (setq file (buffer-file-name))
@@ -266,16 +274,16 @@ Call the new entrie's activate method."
       (oset new-entry face (or face (oref g face)))
       (oset g marks (cons new-entry (oref g marks)))
       (if (oref g active)
-	    (linemark-display new-entry t))
+        (linemark-display new-entry t))
       new-entry)
     ))
 
 (defmethod linemark-new-entry ((g linemark-group) &rest args)
   "Create a new entry for G using init ARGS."
   (let ((f (plist-get args :filename))
-	(l (plist-get args :line)))
+    (l (plist-get args :line)))
     (apply 'linemark-entry (format "%s %d" f l)
-	   args)))
+       args)))
 
 (defmethod linemark-display ((g linemark-group) active-p)
   "Set object G to be active or inactive."
@@ -286,17 +294,17 @@ Call the new entrie's activate method."
   "Set object E to be active or inactive."
   (if active-p
       (with-slots ((file filename)) e
-	(if (oref e overlay)
-	    ;; Already active
-	    nil
+    (if (oref e overlay)
+        ;; Already active
+        nil
           (let ((buffer))
-	    (if (get-file-buffer file)
+        (if (get-file-buffer file)
                 (setq buffer (get-file-buffer file))
               (setq buffer (get-buffer file)))
             (if buffer
-		(with-current-buffer buffer
+        (with-current-buffer buffer
                   (save-excursion
-		    (goto-char (point-min))
+            (goto-char (point-min))
                     (forward-line (1- (oref e line)))
                     (oset e overlay
                           (linemark-make-overlay (point)
@@ -310,12 +318,12 @@ Call the new entrie's activate method."
     ;; Not active
     (with-slots (overlay) e
       (if overlay
-	  (progn
-	    (condition-case nil
-		;; During development of linemark programs, this is helpful
-		(linemark-delete-overlay overlay)
-	      (error nil))
-	    (oset e overlay nil))))))
+      (progn
+        (condition-case nil
+        ;; During development of linemark programs, this is helpful
+        (linemark-delete-overlay overlay)
+          (error nil))
+        (oset e overlay nil))))))
 
 (defmethod linemark-delete ((g linemark-group))
   "Remove group G from linemark tracking."
@@ -352,11 +360,11 @@ Call the new entrie's activate method."
 (defun linemark-kill-buffer-hook ()
   "Deactivate all entries in the current buffer."
   (let ((o (linemark-overlays-in (point-min) (point-max)))
-	(to nil))
+    (to nil))
     (while o
       (setq to (linemark-overlay-get (car o) 'obj))
       (if (and to (linemark-entry-child-p to))
-	  (linemark-display to nil))
+      (linemark-display to nil))
       (setq o (cdr o)))))
 
 (add-hook 'find-file-hooks 'linemark-find-file-hook)
@@ -372,7 +380,7 @@ Call the new entrie's activate method."
   (interactive)
   (let ((ce (linemark-at-point (point) viss-bookmark-group)))
     (if ce
-	(linemark-delete ce)
+    (linemark-delete ce)
       (linemark-add-entry viss-bookmark-group))))
 
 (defun viss-bookmark-next-buffer ()
@@ -380,9 +388,9 @@ Call the new entrie's activate method."
   (interactive)
   (let ((n (linemark-next-in-buffer viss-bookmark-group 1 t)))
     (if n
-	(progn
-	  (goto-char (point-min))
-	  (forward-line (1- (oref n line))))
+    (progn
+      (goto-char (point-min))
+      (forward-line (1- (oref n line))))
       (ding))))
 
 (defun viss-bookmark-prev-buffer ()
@@ -390,19 +398,19 @@ Call the new entrie's activate method."
   (interactive)
   (let ((n (linemark-next-in-buffer viss-bookmark-group -1 t)))
     (if n
-	(progn
-	  (goto-char (point-min))
-	  (forward-line (1- (oref n line))))
+    (progn
+      (goto-char (point-min))
+      (forward-line (1- (oref n line))))
       (ding))))
 
 (defun viss-bookmark-clear-all-buffer ()
   "Clear all bookmarks in this buffer."
   (interactive)
   (mapcar (lambda (e)
-	    (if (or (string= (oref e filename) (buffer-file-name))
+        (if (or (string= (oref e filename) (buffer-file-name))
                     (string= (oref e filename) (buffer-name)))
-		(linemark-delete e)))
-	  (oref viss-bookmark-group marks)))
+        (linemark-delete e)))
+      (oref viss-bookmark-group marks)))
 
 ;; These functions only sort of worked and were not really useful to me.
 ;;
@@ -410,12 +418,12 @@ Call the new entrie's activate method."
 ;;  "Move to the next bookmark."
 ;;  (interactive)
 ;;  (let ((c (linemark-at-point (point) viss-bookmark-group))
-;;	  (n nil))
+;;    (n nil))
 ;;    (if c
-;;	  (let ((n (member c (oref viss-bookmark-group marks))))
-;;	    (if n (setq n (car (cdr n)))
-;;	      (setq n (car (oref viss-bookmark-group marks))))
-;;	    (if n (goto-line (oref n line)) (ding)))
+;;    (let ((n (member c (oref viss-bookmark-group marks))))
+;;      (if n (setq n (car (cdr n)))
+;;        (setq n (car (oref viss-bookmark-group marks))))
+;;      (if n (goto-line (oref n line)) (ding)))
 ;;	;; if no current mark, then just find a local one.
 ;;	(viss-bookmark-next-buffer))))
 ;;
@@ -423,14 +431,14 @@ Call the new entrie's activate method."
 ;;  "Move to the next bookmark."
 ;;  (interactive)
 ;;  (let ((c (linemark-at-point (point) viss-bookmark-group))
-;;	  (n nil))
+;;    (n nil))
 ;;    (if c
-;;	  (let* ((marks (oref viss-bookmark-group marks))
-;;		 (n (member c marks)))
-;;	    (if n
+;;    (let* ((marks (oref viss-bookmark-group marks))
+;;       (n (member c marks)))
+;;      (if n
 ;;		(setq n (- (- (length marks) (length n)) 1))
-;;	      (setq n (car marks)))
-;;	    (if n (goto-line (oref n line)) (ding)))
+;;        (setq n (car marks)))
+;;      (if n (goto-line (oref n line)) (ding)))
 ;;	;; if no current mark, then just find a local one.
 ;;	(viss-bookmark-prev-buffer))))
 ;;
@@ -438,7 +446,7 @@ Call the new entrie's activate method."
 ;;  "Clear all viss bookmarks."
 ;;  (interactive)
 ;;  (mapcar (lambda (e) (linemark-delete e))
-;;	    (oref viss-bookmark-group marks)))
+;;      (oref viss-bookmark-group marks)))
 ;;
 
 ;;;###autoload

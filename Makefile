@@ -10,11 +10,11 @@
 top="$(CURDIR)"/
 ede_FILES=Project.ede Makefile
 
-CEDET_PATH:=~/cedet/trunk/lisp
+CEDET_PATH=
 
 EMACS=emacs
 EMACSFLAGS=-batch --no-site-file --eval '(setq debug-on-error t)'
-LOADPATH= ./  $(CEDET_PATH)/cedet/
+LOADPATH=./ $(CEDET_PATH)
 require=$(foreach r,$(1),(require (quote $(r))))
 LOADDEFS=matlab-load.el
 LOADDIRS=.
@@ -25,7 +25,7 @@ VERSION=3.3.2
 DISTDIR=$(top)matlab-emacs-$(VERSION)
 
 
-
+.PHONY: all
 all: autoloads misc lisp cedet toolbox Templates
 
 .PHONY: clean-autoloads
@@ -61,9 +61,9 @@ tags:
 	$(MAKE) -C toolbox/ $(MFLAGS) $@
 	$(MAKE) -C templates/ $(MFLAGS) $@
 
-
+.PHONY: clean
 clean:
-	rm -f *.elc
+	rm -f *.elc matlab-load.el *~
 
 .PHONY: dist
 

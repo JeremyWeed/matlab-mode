@@ -3,13 +3,12 @@
 ;; Author: Eric M. Ludlam <eludlam@mathworks.com>
 ;; Keywords: tlc
 ;; X-Abstract: Major mode for editing tlc files
-;; Version:
 
 (defvar tlc-version "1.2"
   "The current version of TLC mode.")
 
 ;;
-;; Copyright 1997-2005 The MathWorks, Inc.
+;; Copyright 1997-2017 The MathWorks, Inc.
 ;;
 ;; This program is derived from free software; you can redistribute it
 ;; and/or modify it under the terms of the GNU General Public License
@@ -125,7 +124,7 @@
    '("%\\(exit\\|warning\\|error\\|trace\\) \\([^\n]+\\)$" 2 font-lock-string-face prepend)
    '("\\(%<[^%\n>]+>\\)" 1 font-lock-reference-face prepend)
    (list (concat "\\<\\(" (regexp-opt tlc-keywords) "\\)\\>")
-	 1 'font-lock-type-face)
+     1 'font-lock-type-face)
    '("[^.]\\(\\.\\.\\.\\)$" 1 'underline prepend)
    )
   "List of keywords for nicely coloring X defaults.")
@@ -139,27 +138,29 @@
   (setq mode-name "TLC")
   (use-local-map tlc-mode-map)
   (set-syntax-table tlc-syntax-table)
-  (make-variable-buffer-local 'comment-start-skip)
+  (with-no-warnings
+    (make-variable-buffer-local 'comment-start-skip))
   (make-local-variable 'comment-start)
   (make-local-variable 'comment-end)
   (make-local-variable 'comment-column)
   (make-local-variable 'comment-start-skip)
   (make-local-variable 'comment-multi-line)
   (setq comment-start "/% "
-	comment-end   " %/"
-	comment-multi-line t)
+        comment-end   " %/"
+        comment-multi-line t)
   (setq comment-start-skip "%%\\|/%")
-  (make-variable-buffer-local 'font-lock-comment-start-regexp)
+  (with-no-warnings
+    (make-variable-buffer-local 'font-lock-comment-start-regexp))
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'tlc-indent)
   (make-local-variable 'font-lock-defaults)
   (setq font-lock-defaults '((tlc-font-lock-keywords
-			      )
-			     nil ; do not do string/comment highlighting
-			     nil ; keywords are case sensitive.
-			     ;; This puts _ as a word constituant,
-			     ;; simplifying our keywords significantly
-			     ((?_ . "w"))))
+                              )
+                             nil ; do not do string/comment highlighting
+                             nil ; keywords are case sensitive.
+                             ;; This puts _ as a word constituant,
+                             ;; simplifying our keywords significantly
+                             ((?_ . "w"))))
   (tlc-version)
   )
 
@@ -177,88 +178,90 @@
   (indent-to (tlc-calc-indentation))
   )
 
+(defvar tlc--indent-because-of-continuation nil)
+
 (defun tlc-calc-indentation ()
   "Calculate the indentation of this line."
   (beginning-of-line)
   (let ((i (cond
-	    ((looking-at
-	      "\\s-*\\(\\(\\(%end\\(roll\\|with\\|if\\|for\\|\
+            ((looking-at
+              "\\s-*\\(\\(\\(%end\\(roll\\|with\\|if\\|for\\|\
 foreach\\|while\\|function\\)\\|%else\\|%elseif\\|%case\\|%default\\)\\>\\)\
 \\|}\\)")
-	     -2)
-	    ((looking-at "\\s-*%/")
-	     -1)
-	    ((looking-at "\\s-*%endswitch")
-	     -4)
-	    (t 0)))
-	(percent (looking-at "\\s-*%"))
-	(percent-slash (looking-at "\\s-*%/"))
-	(percent-percent (looking-at "\\s-*%%"))
-	(indent-because-of-continuation nil))
+             -2)
+            ((looking-at "\\s-*%/")
+             -1)
+            ((looking-at "\\s-*%endswitch")
+             -4)
+            (t 0)))
+        (percent (looking-at "\\s-*%"))
+        (percent-slash (looking-at "\\s-*%/"))
+        (percent-percent (looking-at "\\s-*%%")))
 
+    (setq tlc--indent-because-of-continuation nil)
     (if (bobp) (current-indentation)
       (save-excursion
-	(forward-line -1)
-	(beginning-of-line)
-	(while (and (looking-at "^\\s-*$") (not (bobp))) (forward-line -1))
-	(cond ((bobp) nil)
-	      ((and percent (looking-at "\\s-*/%"))
-	       (setq i (+ (current-indentation) 1)))
-	      ((and percent-slash (tlc-in-multiline-comment)
-		    (looking-at "\\s-*%"))
-	       (setq i (+ (current-indentation) 0)))
-	      (t
-	       (let* ((nexti (tlc-calc-next-indentation)))
-		 (setq i (+ (current-indentation)
-			    (if (and indent-because-of-continuation
-				     (or (> 0 i) percent-percent))
-				i
-			      (+ i nexti)))))
-	       (if (< i 0) (setq i 0))))
-	i))))
+        (forward-line -1)
+        (beginning-of-line)
+        (while (and (looking-at "^\\s-*$") (not (bobp))) (forward-line -1))
+        (cond ((bobp) nil)
+              ((and percent (looking-at "\\s-*/%"))
+               (setq i (+ (current-indentation) 1)))
+              ((and percent-slash (tlc-in-multiline-comment)
+                    (looking-at "\\s-*%"))
+               (setq i (+ (current-indentation) 0)))
+              (t
+               (let* ((nexti (tlc-calc-next-indentation)))
+                 (setq i (+ (current-indentation)
+                            (if (and tlc--indent-because-of-continuation
+                                     (or (> 0 i) percent-percent))
+                                i
+                              (+ i nexti)))))
+               (if (< i 0) (setq i 0))))
+        i))))
 
 (defun tlc-calc-next-indentation ()
   "Calc how much more to indent the next line."
   (+
    (cond ((save-excursion
-	    (and (not (tlc-assignment-continuation-p))
-		 (tlc-beginning-of-statement))
-	    (looking-at "\\s-*\\(\\(%\\(case\\|roll\\|with\\|if\\|for\\|\
+            (and (not (tlc-assignment-continuation-p))
+                 (tlc-beginning-of-statement))
+            (looking-at "\\s-*\\(\\(%\\(case\\|roll\\|with\\|if\\|for\\|\
 foreach\\|while\\|else\\|elseif\\|default\\|function\\)\\>\\)\\|/%\\)"))
-	  2)
-	 ((looking-at "\\s-*%/")
-	  -1)
-	 ((looking-at "\\s-*\\(%switch\\)\\>")
-	  4)
-	 ;((looking-at "\\s-*%break\\>")
-	 ; -2)
-	 ((and (save-excursion (end-of-line)
-			       (or (tlc-assignment-continuation-p)
-				   (progn (forward-char -3)
-					  (looking-at "\\\\$"))))
-	       (save-excursion (forward-line -1)
-			       (end-of-line)
-			       (not
-				(or (tlc-assignment-continuation-p)
-				    (progn (forward-char -3)
-					   (looking-at "\\\\$"))))))
-	  (setq indent-because-of-continuation t)
-	  2)
-	 ((or (save-excursion (end-of-line)
-			      (= (preceding-char) ?{))
-	      )
-	  2)
-	 (t 0))
+          2)
+         ((looking-at "\\s-*%/")
+          -1)
+         ((looking-at "\\s-*\\(%switch\\)\\>")
+          4)
+                                        ;((looking-at "\\s-*%break\\>")
+                                        ; -2)
+         ((and (save-excursion (end-of-line)
+                               (or (tlc-assignment-continuation-p)
+                                   (progn (forward-char -3)
+                                          (looking-at "\\\\$"))))
+               (save-excursion (forward-line -1)
+                               (end-of-line)
+                               (not
+                                (or (tlc-assignment-continuation-p)
+                                    (progn (forward-char -3)
+                                           (looking-at "\\\\$"))))))
+          (setq tlc--indent-because-of-continuation t)
+          2)
+         ((or (save-excursion (end-of-line)
+                              (= (preceding-char) ?{))
+              )
+          2)
+         (t 0))
    (if (and (not (tlc-line-special))
-	    (not (save-excursion (end-of-line)
-				 (or (tlc-assignment-continuation-p)
-				     (progn (forward-char -3)
-					    (looking-at "\\\\$")))))
-	    (save-excursion (forward-line -1)
-			    (end-of-line)
-			    (or (tlc-assignment-continuation-p)
-				(progn (forward-char -3)
-				       (looking-at "\\\\$")))))
+            (not (save-excursion (end-of-line)
+                                 (or (tlc-assignment-continuation-p)
+                                     (progn (forward-char -3)
+                                            (looking-at "\\\\$")))))
+            (save-excursion (forward-line -1)
+                            (end-of-line)
+                            (or (tlc-assignment-continuation-p)
+                                (progn (forward-char -3)
+                                       (looking-at "\\\\$")))))
        -2
      0)))
 
@@ -291,14 +294,14 @@ foreach\\|while\\|else\\|elseif\\|default\\|function\\)\\>\\)\\|/%\\)"))
   (save-excursion
     (save-match-data
       (if (re-search-backward "/%\\|%/" nil t)
-	  (if (looking-at "/%")
-	      t
-	    nil)
-	nil))))
+          (if (looking-at "/%")
+              t
+            nil)
+        nil))))
 
 ;;; Add to mode list
-;;;###autoload(add-to-list 'auto-mode-alist '("\\.tlc$" .tlc-mode))
-(add-to-list 'auto-mode-alist '("\\.tlc$" .tlc-mode))
+;;;###autoload(add-to-list 'auto-mode-alist '("\\.tlc$" . tlc-mode))
+(add-to-list 'auto-mode-alist '("\\.tlc$" . tlc-mode))
 
 (provide 'tlc)
 

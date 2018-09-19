@@ -33,6 +33,9 @@
       (require 'semanticdb)
     (error (require 'semantic/db))))
 
+(eval-and-compile
+  (require 'matlab))
+
 ;;; Code:
 
 ;; Put all directories which should be recursively scanned for your
@@ -41,7 +44,7 @@
 (defvar semanticdb-matlab-include-paths
   (if (file-exists-p (expand-file-name "~/matlab"))
       (list (expand-file-name "~/matlab") ;; Default location for extra code.
-	    )
+        )
     ;; Else, no default path.
     nil)
   "Directories which should be scanned for m-files.")
@@ -59,9 +62,9 @@
    ;; eieio-singleton
    )
   ((new-table-class :initform semanticdb-table-matlab
-		    :type class
-		    :documentation
-		    "New tables created for this database are of this class.")
+            :type class
+            :documentation
+            "New tables created for this database are of this class.")
    )
   "Database representing MATLAB path.")
 
@@ -115,8 +118,7 @@ Create one of our special tables that can act as an intermediary."
   "Return non-nil if TABLE's mode is equivalent to BUFFER.
 Equivalent modes are specified by by `semantic-equivalent-major-modes'
 local variable."
-  (save-excursion
-    (set-buffer buffer)
+  (with-current-buffer buffer
     (eq (or mode-local-active-mode major-mode) 'matlab-mode)))
 
 (defmethod semanticdb-full-filename ((obj semanticdb-table-matlab))
@@ -139,21 +141,24 @@ If brutish, do the default action.
 If not brutish, do the default action, and append the system
 database (if available.)"
   (let ((default
-	  ;; When we recurse, disable searching of system databases
-	  ;; so that our MATLAB database only shows up once when
-	  ;; we append it in this iteration.
-	  (let ((semanticdb-search-system-databases nil)
-		)
-	    (semanticdb-find-translate-path-default path brutish))))
+          ;; When we recurse, disable searching of system databases
+          ;; so that our MATLAB database only shows up once when
+          ;; we append it in this iteration.
+          (let ((semanticdb-search-system-databases nil)
+                )
+            (if (fboundp 'semanticdb-find-translate-path-default)
+                (semanticdb-find-translate-path-default path brutish)
+              (error "semanticdb-find-translate-path-default doesn't exist")
+              ))))
     ;; Don't add anything if BRUTISH is on (it will be added in that fcn)
     ;; or if we aren't supposed to search the system.
     (if (or brutish (not semanticdb-search-system-databases))
-	default
+        default
       (let ((tables (apply #'append
-			   (mapcar
-			    (lambda (db) (semanticdb-get-database-tables db))
-			    semanticdb-project-system-databases))))
-	(append default tables)))))
+                           (mapcar
+                            (lambda (db) (semanticdb-get-database-tables db))
+                            semanticdb-project-system-databases))))
+        (append default tables)))))
 
 ;;; Search Overrides
 ;;
@@ -190,24 +195,24 @@ This function will add the current buffer file name to
 `semanticdb-matlab-user-files-cache' if not already there.  Meant
 to be called in local `after-save-hook'."
   (unless (and semanticdb-matlab-user-files-cache
-	       (member (buffer-file-name)
-		       (cdr semanticdb-matlab-user-files-cache)))
+           (member (buffer-file-name)
+               (cdr semanticdb-matlab-user-files-cache)))
     (setcdr semanticdb-matlab-user-files-cache
-	  (append (cdr semanticdb-matlab-user-files-cache)
-		  (list (buffer-file-name))))))
+      (append (cdr semanticdb-matlab-user-files-cache)
+          (list (buffer-file-name))))))
 
 ;; Make sure newly created MATLAB files get in the user-files-cache
 (add-hook 'matlab-mode-hook
-	  (lambda ()
-	    ;; add buffer-local after-save-hook
-	    (add-hook
-	     'after-save-hook
-	     'semanticdb-matlab-possibly-add-buffer-to-cache t t)))
+      (lambda ()
+        ;; add buffer-local after-save-hook
+        (add-hook
+         'after-save-hook
+         'semanticdb-matlab-possibly-add-buffer-to-cache t t)))
 
 ;; Helper functions
 
 (defun semanticdb-matlab-scan-directories
-  (dirs &optional recursive exclude-classes exclude-private)
+    (dirs &optional recursive exclude-classes exclude-private)
   "Get list of all m-files in DIRS.
 DIRS is a list of directories.  If RECURSIVE, every subdirectory
 will be included in the search.  If EXCLUDE-CLASSES, class
@@ -215,43 +220,47 @@ directories (beginning with '@') will be skipped.  If
 EXCLUDE-PRIVATE, 'private' directories will be skipped."
   (if dirs
       (let (files)
-	(dolist (dir dirs)
-	  (let (subdirs)
-	    (dolist (cur (directory-files dir t "[^.]" t))
-	      (if (file-directory-p cur)
-		  (when (and recursive
-			     (not (and exclude-classes
-				       (string-match ".*/@" cur)))
-			     (not (and exclude-private
-				       (string-match ".*/private$" cur))))
-		    (push cur subdirs))
-		(when (string-match "\\.m$" cur)
-		  (push cur files))))
-	    (when subdirs
-	      (setq files
-		    (append files
-			    (semanticdb-matlab-scan-directories
-			     subdirs recursive exclude-classes exclude-private))))))
-	files)
+        (dolist (dir dirs)
+          (let (subdirs)
+            (dolist (cur (directory-files dir t "[^.]" t))
+              (if (file-directory-p cur)
+                  (when (and recursive
+                             (not (and exclude-classes
+                                       (string-match ".*/@" cur)))
+                             (not (and exclude-private
+                                       (string-match ".*/private$" cur))))
+                    (push cur subdirs))
+                (when (string-match "\\.m$" cur)
+                  (push cur files))))
+            (when subdirs
+              (setq files
+                    (append files
+                            (semanticdb-matlab-scan-directories
+                             subdirs recursive exclude-classes exclude-private))))))
+        files)
     nil))
+
+(defvar semantic-matlab-dependency-system-include-path) ;; quiet compiler warning
 
 (defun semanticdb-matlab-cache-files ()
   "Cache user and system MATLAB files if necessary."
   ;; car of *-file-cache variables is used as flag
   (unless (car semanticdb-matlab-system-files-cache)
     (setq semanticdb-matlab-system-files-cache
-	  (cons t
-		(semanticdb-matlab-scan-directories
-		 semantic-matlab-dependency-system-include-path t t t))))
+          (cons t
+                (semanticdb-matlab-scan-directories
+                 semantic-matlab-dependency-system-include-path t t t))))
   (unless (car semanticdb-matlab-user-files-cache)
     (setq semanticdb-matlab-user-files-cache
-	  (cons t
-		(semanticdb-matlab-scan-directories
-		 semanticdb-matlab-include-paths t nil nil)))
+          (cons t
+                (semanticdb-matlab-scan-directories
+                 semanticdb-matlab-include-paths t nil nil)))
     ;; cache user defined old-style classes
     (setq semanticdb-matlab-user-class-cache
-	  (semantic-matlab-find-oldstyle-classes
-	   (cdr semanticdb-matlab-user-files-cache)))))
+          (if (fboundp 'semantic-matlab-find-oldstyle-classes)
+              (semantic-matlab-find-oldstyle-classes (cdr semanticdb-matlab-user-files-cache))
+            (error "semantic-matlab-find-oldstyle-classes not found"))
+          )))
 
 (defun semanticdb-matlab-find-name (name &optional type)
   "Find NAME in matlab file names.
@@ -259,8 +268,8 @@ If TYPE is 'regex, NAME is a regular expression.
 If TYPE is 'prefix, NAME is a prefix."
   (semanticdb-matlab-cache-files)
   (let ((files (append (cdr semanticdb-matlab-system-files-cache)
-		       (cdr semanticdb-matlab-user-files-cache)))
-	regexp results)
+                       (cdr semanticdb-matlab-user-files-cache)))
+        regexp results)
     (cond
      ((eq type 'prefix)
       (setq regexp (format "^%s.*\\.m$" name)))
@@ -270,7 +279,7 @@ If TYPE is 'prefix, NAME is a prefix."
       (setq regexp (format "^%s\\.m" name))))
     (dolist (cur files)
       (when (string-match regexp (file-name-nondirectory cur))
-	(push cur results)))
+        (push cur results)))
     results))
 
 (define-mode-local-override semantic-ctxt-current-class-list
@@ -280,11 +289,11 @@ If point is nil, the current buffer location is used."
   (cond
    ((looking-at ".+=")
     '(variable type))
-   ((looking-back "\\(get\\|set\\)([a-zA-Z_0-9]*")
+   ((looking-back "\\(get\\|set\\)([a-zA-Z_0-9]*" nil)
     '(variable type))
-   ((looking-back "\\(get\\|set\\)([a-zA-Z_0-9]+,'[a-zA-Z_0-9]*")
+   ((looking-back "\\(get\\|set\\)([a-zA-Z_0-9]+,'[a-zA-Z_0-9]*" nil)
     '(variable))
-   ((looking-back "\\.[a-zA-Z_0-9]*")
+   ((looking-back "\\.[a-zA-Z_0-9]*" nil)
     '(variable))
    ((looking-at "\\s-*([a-zA-Z_0-9]+,")
     '(function))
@@ -302,23 +311,23 @@ Return a list of tags."
     (let (where)
       ;; If MATLAB shell is active, use it.
       (when (and (matlab-shell-active-p)
-		 (setq where (matlab-shell-which-fcn name)))
-	(when (and (not (file-exists-p (car where)))
-		   ;; Sometimes MATLAB builtin functions lie.
-		   (string-match "@" (car where)))
-	  (setq where
-		(list
-		 (concat
-		  (substring (car where) 0 (match-beginning 0))
-		  name ".m")))))
+                 (setq where (matlab-shell-which-fcn name)))
+        (when (and (not (file-exists-p (car where)))
+                   ;; Sometimes MATLAB builtin functions lie.
+                   (string-match "@" (car where)))
+          (setq where
+                (list
+                 (concat
+                  (substring (car where) 0 (match-beginning 0))
+                  name ".m")))))
       (unless (car where)
-	;; Fall back to home-made database.
-	(setq where 
-	      (list (car (semanticdb-matlab-find-name name)))))
+        ;; Fall back to home-made database.
+        (setq where
+              (list (car (semanticdb-matlab-find-name name)))))
       (if (car where)
-	  (list (car (semanticdb-file-stream (car where))))
-	nil))))
-      
+          (list (car (semanticdb-file-stream (car where))))
+        nil))))
+
 (defmethod semanticdb-find-tags-by-name-regexp-method
   ((table semanticdb-table-matlab) regex &optional tags)
   "Find all tags with name matching REGEX in TABLE.
@@ -327,10 +336,10 @@ Return a list of tags."
   (if tags (call-next-method)
     (let ((files (semanticdb-matlab-find-name regex 'regex)))
       (delq nil
-	    (mapcar '(lambda (x)
-		       (let ((matlab-vers-on-startup nil))
-			 (car (semanticdb-file-stream x))))
-		    files)))))
+            (mapcar #'(lambda (x)
+                        (let ((matlab-vers-on-startup nil))
+                          (car (semanticdb-file-stream x))))
+                    files)))))
 
 (defmethod semanticdb-find-tags-for-completion-method
   ((table semanticdb-table-matlab) prefix &optional tags)
@@ -341,36 +350,36 @@ Returns a table of all matching tags."
   (if tags (call-next-method)
     ;; first, get completions from home-made database...
     (let ((compdb (semanticdb-matlab-find-name prefix 'prefix))
-	  compshell)
+          compshell)
       ;; ...and from MATLAB shell, if available
       (when (matlab-shell-active-p)
-	(setq compshell
-	      (mapcar 
-	       (lambda (x)
-		 (let ((where (matlab-shell-which-fcn (car x))))
-		   ;; correct name for builtin functions
-		   (when (and (cdr where)
-			      (string-match 
-			       "\\(.*\\)/@.*\\(/[A-Za-z_0-9]+\\.m\\)" 
-			       (car where)))
-		     (setq where
-			   (list 
-			    (concat (match-string 1 (car where)) 
-				    (match-string 2 (car where))))))
-		   (list (car where))))
-	       (matlab-shell-completion-list prefix)))
-	;; combine results
-	(mapc
-	 (lambda (x)
-	   (unless (member x compdb)
-	     (setq compdb (append compdb x))))
-	 compshell))
+        (setq compshell
+              (mapcar
+               (lambda (x)
+                 (let ((where (matlab-shell-which-fcn (car x))))
+                   ;; correct name for builtin functions
+                   (when (and (cdr where)
+                              (string-match
+                               "\\(.*\\)/@.*\\(/[A-Za-z_0-9]+\\.m\\)"
+                               (car where)))
+                     (setq where
+                           (list
+                            (concat (match-string 1 (car where))
+                                    (match-string 2 (car where))))))
+                   (list (car where))))
+               (matlab-shell-completion-list prefix)))
+        ;; combine results
+        (mapc
+         (lambda (x)
+           (unless (member x compdb)
+             (setq compdb (append compdb x))))
+         compshell))
       ;; generate tags
       (delq nil
-	    (mapcar '(lambda (x)
-		       (let ((matlab-vers-on-startup nil))
-			 (car (semanticdb-file-stream x))))
-		    compdb)))))
+            (mapcar #'(lambda (x)
+                        (let ((matlab-vers-on-startup nil))
+                          (car (semanticdb-file-stream x))))
+                    compdb)))))
 
 (provide 'semanticdb-matlab)
 

@@ -8,7 +8,7 @@
 ;; Version: 1.0
 ;; Keywords:
 
- 
+
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation; either version 1, or (at your option)
@@ -36,29 +36,29 @@
 ;; $Id$
 ;; $Log$
 ;; Revision 1.9  2009/03/08 09:38:31  oub
-;; 	* matlab-publish.el (matlab-select-environment): change function
-;; 	slightly
-;; 	(matlab-insert-section): new function
+;;  * matlab-publish.el (matlab-select-environment): change function
+;;  slightly
+;;  (matlab-insert-section): new function
 ;;
 ;; Revision 1.8  2009/03/07 13:54:57  oub
-;; 	  (matlab-write-region-novisit): New function
-;; 	  (matlab-publish-region-old): new function
-;; 	  (matlab-publish-region): New function
-;; 	  (matlab-publish-region-latex): new function
-;; 	  (matlab-publish-region-html): new function
+;;    (matlab-write-region-novisit): New function
+;;    (matlab-publish-region-old): new function
+;;    (matlab-publish-region): New function
+;;    (matlab-publish-region-latex): new function
+;;    (matlab-publish-region-html): new function
 ;;
 ;; Revision 1.7  2009/03/07 13:26:55  oub
-;; 	(matlab-show-matlab-shell): New variable
-;; 	(matlab-publish-file-latex): add
-;; 	  (if matlab-show-matlab-shell
-;; 	  (matlab-show-matlab-shell-buffer)))
+;;  (matlab-show-matlab-shell): New variable
+;;  (matlab-publish-file-latex): add
+;;    (if matlab-show-matlab-shell
+;;    (matlab-show-matlab-shell-buffer)))
 ;;
 ;; Revision 1.6  2009/03/07 11:00:04  oub
-;; 	* matlab-publish.el (matlab-boldify): Modify the function.
+;;  * matlab-publish.el (matlab-boldify): Modify the function.
 ;;
 ;; Revision 1.5  2009/03/06 14:24:47  oub
-;; 	* matlab-publish.el (matlab-temp-region-file): new variable
-;; 	(matlab-write-region): New function
+;;  * matlab-publish.el (matlab-temp-region-file): new variable
+;;  (matlab-write-region): New function
 ;;
 ;; Revision 1.4  2009/02/26 16:18:23  oub
 ;; modifiy the insert functions in order that the jump to the text where
@@ -111,8 +111,8 @@
 ;; (defun my-publish-matlab ()
 ;;   (interactive)
 ;;   (let ((pub (file-name-nondirectory (buffer-file-name))))
-;; 	(let ((arg (concat "publish('" pub "','latex')")))
-;; 	  (matlab-shell-run-command arg))))
+;;  (let ((arg (concat "publish('" pub "','latex')")))
+;;    (matlab-shell-run-command arg))))
 
 (require 'matlab)
 
@@ -136,25 +136,25 @@ HTML format."
 (defun matlab-publish-file-latex ()		;Version-1.7
 "Publish a matlab file in the LaTeX format."
   (interactive)
-  (let ((pub (file-name-nondirectory (buffer-file-name)))) 
-	(matlab-shell-run-command (format "publish('%s','latex')" pub)))
+  (let ((pub (file-name-nondirectory (buffer-file-name))))
+    (matlab-shell-run-command (format "publish('%s','latex')" pub)))
   (if matlab-show-matlab-shell
-	  (matlab-show-matlab-shell-buffer)))
+      (matlab-show-matlab-shell-buffer)))
 
 
 
 (defun matlab-publish-file-html ()		;Version-1.7
   (interactive)
-"Publish a matlab file in the html format."
+  "Publish a matlab file in the html format."
   (let ((pub (file-name-nondirectory (buffer-file-name))))
- 	(matlab-shell-run-command (format "publish('%s','html')" pub)))
+    (matlab-shell-run-command (format "publish('%s','html')" pub)))
   (if matlab-show-matlab-shell
-	  (matlab-show-matlab-shell-buffer)))
+      (matlab-show-matlab-shell-buffer)))
 
 
 
-(defun matlab-select-environment (ch) 	;Version-1.9
-"This functions inserts structured text, which results for example 
+(defun matlab-select-environment (ch)   ;Version-1.9
+"This functions inserts structured text, which results for example
 in LaTeX mode in title, sections, description, boldified text,  unnumbered equations and bullet list."
   (interactive "c1: title, 2: section, 3:descrip, 4:boldify, 5:equation, 6:list ")
   (setq ch (downcase ch))
@@ -191,19 +191,19 @@ in LaTeX mode in title, sections, description, boldified text,  unnumbered equat
 
 
 (defun matlab-boldify ()				;Version-1.6
-"Insert either \%\%\\n \% \*BOLD TEXT\*\\n or, when mark is active,
+  "Insert either \%\%\\n \% \*BOLD TEXT\*\\n or, when mark is active,
 surrounds region by * *."
   (interactive)
   (if (or (and (boundp 'zmacs-region-active-p) zmacs-region-active-p)
-		  (and (boundp 'transient-mark-mode) transient-mark-mode mark-active))
-	  (save-excursion
-		(goto-char (point))
-		(insert "*")
-		(goto-char (mark))
-		(insert "*"))
-  (insert "\n%%\n")
-  (insert "% *BOLD TEXT*\n")
-	(backward-char 2)))
+          (and (boundp 'transient-mark-mode) transient-mark-mode mark-active))
+      (save-excursion
+        (goto-char (point))
+        (insert "*")
+        (goto-char (mark))
+        (insert "*"))
+    (insert "\n%%\n")
+    (insert "% *BOLD TEXT*\n")
+    (backward-char 2)))
 
 
 (defun matlab-insert-bold-text ()
@@ -224,7 +224,7 @@ surrounds region by * *."
 (defun matlab-insert-preformated-text ()
   (interactive)
   (insert "%%\n")
-  (insert "%\n") 
+  (insert "%\n")
   (insert "%  PREFORMATTED\n")
   (insert "%  TEXT\n")
   (insert "% \n")
@@ -276,7 +276,7 @@ surrounds region by * *."
                             (t (error 'args-out-of-range '(1 2 ch))))))
 
 
-(defun matlab-publish-region (start end ch)	 ;Version-1.8
+(defun matlab-publish-region (start end ch)  ;Version-1.8
   (interactive "r\nc1: LaTeX, 2: HTML ")
   (setq ch (downcase ch))
   (write-region start end (expand-file-name matlab-temp-region-file) nil nil nil nil)
@@ -288,17 +288,17 @@ surrounds region by * *."
 
 (defun matlab-publish-region-latex ()	;Version-1.8
   (interactive)
-	(matlab-shell-run-command (format "publish('%s','latex')" matlab-temp-region-file))
+  (matlab-shell-run-command (format "publish('%s','latex')" matlab-temp-region-file))
   (if matlab-show-matlab-shell
-	  (matlab-show-matlab-shell-buffer)))
+      (matlab-show-matlab-shell-buffer)))
 
 
 
 (defun matlab-publish-region-html ()	;Version-1.8
   (interactive)
-	(matlab-shell-run-command (format "publish('%s','html')" matlab-temp-region-file))
+  (matlab-shell-run-command (format "publish('%s','html')" matlab-temp-region-file))
   (if matlab-show-matlab-shell
-	  (matlab-show-matlab-shell-buffer)))
+      (matlab-show-matlab-shell-buffer)))
 
 
 

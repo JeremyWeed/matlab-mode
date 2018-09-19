@@ -3,12 +3,11 @@
 ;; Author: Eric M. Ludlam <eludlam@mathworks.com>
 ;; Maintainer: Eric M. Ludlam <eludlam@mathworks.com>
 ;; Created: June 25, 2002
-;; Version:
 
 (defvar mlint-version "1.3.1"
   "The current version of mlint minor mode.")
 
-;; Copyright (C) 2002-2005, 2013, 2014 The MathWorks Inc.
+;; Copyright (C) 2002-2005, 2013, 2014, 2016-2017 The MathWorks Inc.
 ;;
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -25,43 +24,55 @@
 ;; the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 ;;; Commentary:
-;; 
+;;
 ;; Run mlint, and highlight the problems in the buffer.
 ;;
 
 (require 'matlab)
 (require 'linemark)
+(eval-when-compile
+  (require 'cl))
+
+(eval-and-compile
+  ;; `object-name-string' is an obsolete function (as of 24.4); use `eieio-object-name-string' instead.
+  (cond ((fboundp 'eieio-object-name-string)
+         (defalias 'mlint-object-name-string 'eieio-object-name-string))
+        (t
+         (defalias 'mlint-object-name-string 'object-name-string)))
+  )
+
+;; `goto-line' is for interactive use only; use `forward-line' instead.
+(defun mlint-goto-line (n) (goto-char (point-min)) (forward-line (1- n)))
 
 ;;; Code:
 (defvar mlint-platform
-  ;; xxx which matlab
   ;;     MATLABROOT/bin/util/arch.sh (or arch.bat)
   (cond ((eq system-type 'darwin)
-	 (if (string-match "i386" system-configuration)
-	     (let ((mt (getenv "MACHTYPE")))
-	       (if (and (stringp mt) (string= "x86_32" mt))
-		   ;; This hack is bad since an Emacs started from
-		   ;; the doc doesn't have this variable, thus by defaulting
-		   ;; to checking the 32 bit (not common anymore) version,
-		   ;; we'll get the right answer most of the time.
-		   "maci" "maci64"))
-	   "mac"))
-	((eq system-type 'gnu/linux)
-	 (cond ((string-match "64\\|i686" system-configuration)
-		"glnxa64")
-	       (t "glnx86")))
-	((eq system-type 'solaris)
-	 "sol2")
-	((eq system-type 'hpux)
-	 "hpux")
-	((eq system-type 'windows-nt)
+     (if (string-match "i386" system-configuration)
+         (let ((mt (getenv "MACHTYPE")))
+           (if (and (stringp mt) (string= "x86_32" mt))
+           ;; This hack is bad since an Emacs started from
+           ;; the doc doesn't have this variable, thus by defaulting
+           ;; to checking the 32 bit (not common anymore) version,
+           ;; we'll get the right answer most of the time.
+           "maci" "maci64"))
+       "mac"))
+    ((eq system-type 'gnu/linux)
+     (cond ((string-match "64\\|i686" system-configuration)
+        "glnxa64")
+           (t "glnx86")))
+    ((eq system-type 'solaris)
+     "sol2")
+    ((eq system-type 'hpux)
+     "hpux")
+    ((eq system-type 'windows-nt)
          ;; Thought about checking the env PROCESSOR_ARCHITEW6432,
          ;; but this said AMD on my Intel, which seemed suspicious.
-	 (let ((proc (getenv "PROCESSOR_IDENTIFIER")))
-	   (if (and (stringp proc) (string-match "64" proc))
-	       "win64"
-	     "win32")))
-	(t "unknown"))
+     (let ((proc (getenv "PROCESSOR_IDENTIFIER")))
+       (if (and (stringp proc) (string-match "64" proc))
+           "win64"
+         "win32")))
+    (t "unknown"))
   "Platform we are running mlint on.")
 
 (defcustom mlint-calculate-cyclic-complexity-flag nil
@@ -92,25 +103,27 @@ SYMBOL is the variable being set.  VALUE is the new value."
   "Program to run for MLint.
 This value can be automatically set by `mlint-programs'.")
 
+(defvar mlint-programs) ;; forward declaration to quiet compiler warning
+
 (defun mlint-reset-program ()
   "Reset `mlint-program'."
   (setq mlint-program
-	(let ((mlp mlint-programs)
-	      (ans nil))
-	  (while (and mlp (not ans))
-	    (cond ((null (car mlp))
-		   nil)
-		  ((file-executable-p (car mlp))
-		   (setq ans (car mlp)))
-		  ((executable-find (car mlp))
-		   (setq ans (executable-find (car mlp))))
-		  (t nil))
-	    (setq mlp (cdr mlp)))
-	  ans)))
+    (let ((mlp mlint-programs)
+          (ans nil))
+      (while (and mlp (not ans))
+        (cond ((null (car mlp))
+           nil)
+          ((file-executable-p (car mlp))
+           (setq ans (car mlp)))
+          ((executable-find (car mlp))
+           (setq ans (executable-find (car mlp))))
+          (t nil))
+        (setq mlp (cdr mlp)))
+      ans)))
 
 (defcustom mlint-programs (list
-			   "mlint"
-			   (concat mlint-platform "/mlint"))
+               "mlint"
+               (concat mlint-platform "/mlint"))
   "*List of possible locations of the mlint program."
   :group 'mlint
   :type '(repeat (file :tag "MLint Program: "))
@@ -166,76 +179,75 @@ created is of the class in CDR.")
 Argument STRING is the text to interpret."
   (save-match-data
     (if (string-match "\\([0-9]+\\)-\\([0-9]+\\)" string)
-	(cons (string-to-int (match-string 1 string))
-	      (string-to-int (match-string 2 string)))
-      (let ((i (string-to-int string)))
-	(cons i i)))))
+    (cons (string-to-number (match-string 1 string))
+          (string-to-number (match-string 2 string)))
+      (let ((i (string-to-number string)))
+    (cons i i)))))
 
 (defun mlint-run (&optional buffer)
   "Run mlint on BUFFER and return a list of issues.
 If BUFFER is nil, use the current buffer."
   (when (and (file-exists-p (buffer-file-name)) mlint-program)
     (let* ((fn (buffer-file-name (current-buffer)))
-	   (buffer-mlint-program mlint-program)
+       (buffer-mlint-program mlint-program)
            (dd default-directory)
            (show-mlint-warnings matlab-show-mlint-warnings)
            (highlight-cross-function-variables
             (and matlab-functions-have-end
                  matlab-highlight-cross-function-variables))
            (flags (let ((tmp (if matlab-show-mlint-warnings mlint-flags nil)))
-		    (setq tmp
-			  (if highlight-cross-function-variables
-			      (cons "-edit" tmp)
-			    tmp))
-		    (setq tmp
-			  (if mlint-calculate-cyclic-complexity-flag
-			      (cons "-cyc" tmp)
-			    tmp))
-		    tmp))
+            (setq tmp
+              (if highlight-cross-function-variables
+                  (cons "-edit" tmp)
+                tmp))
+            (setq tmp
+              (if mlint-calculate-cyclic-complexity-flag
+                  (cons "-cyc" tmp)
+                tmp))
+            tmp))
            (errors nil)
            (n nil)
-	   (symtab nil))
-      (save-excursion
-	(set-buffer (get-buffer-create "*M-Lint*"))
-	(erase-buffer)
-	(when mlint-verbose (message "Running mlint..."))
+       (symtab nil))
+      (with-current-buffer (get-buffer-create "*M-Lint*")
+    (erase-buffer)
+    (when mlint-verbose (message "Running mlint..."))
 
-	(apply 'call-process buffer-mlint-program nil (current-buffer) nil
-	       (append flags (list fn)))
+    (apply 'call-process buffer-mlint-program nil (current-buffer) nil
+           (append flags (list fn)))
 
-	(when mlint-verbose (message "Running mlint...done"))
-	(goto-char (point-min))
+    (when mlint-verbose (message "Running mlint...done"))
+    (goto-char (point-min))
         (when highlight-cross-function-variables
           (when (not (re-search-forward mlint-output-regex nil t))
-	    (goto-char (point-max)))
+        (goto-char (point-max)))
           (when (re-search-backward "^ *\\([0-9]+\\)" nil t)
-	    (goto-char (point-min))
-	    (setq n (1+ (string-to-int (match-string 1))))
-	    (setq symtab (make-vector n nil))
-	    (while (re-search-forward mlint-symtab-line-regex nil t)
-	      (let ((name (match-string 2))
-		    (parent-index (string-to-int (match-string 3)))
-		    (column (match-string 7)))
-		(if column ;; line defines a function
-		    (aset symtab (string-to-int (match-string 1))
-			  (list name
-				(when (/= parent-index 0) parent-index)
-				(cons (string-to-int (match-string 6))
-				      (string-to-int column))))
-		  (let ((parent (cddr (aref symtab parent-index))))
-		    (if parent
-			(rplacd parent (cons name (cdr parent))))))))))
+        (goto-char (point-min))
+        (setq n (1+ (string-to-number (match-string 1))))
+        (setq symtab (make-vector n nil))
+        (while (re-search-forward mlint-symtab-line-regex nil t)
+          (let ((name (match-string 2))
+            (parent-index (string-to-number (match-string 3)))
+            (column (match-string 7)))
+        (if column ;; line defines a function
+            (aset symtab (string-to-number (match-string 1))
+              (list name
+                (when (/= parent-index 0) parent-index)
+                (cons (string-to-number (match-string 6))
+                      (string-to-number column))))
+          (let ((parent (cddr (aref symtab parent-index))))
+            (if parent
+            (rplacd parent (cons name (cdr parent))))))))))
         (when show-mlint-warnings
-	  (while (re-search-forward mlint-output-regex nil t)
-	    (setq errors (cons
-			  (list (string-to-int (match-string 1))
-				(mlint-column-output (match-string 2))
-				(match-string 4)
-				"" ; this was the warning code (level)
-				(match-string 3)
-				)
-			  errors))))
-	)
+      (while (re-search-forward mlint-output-regex nil t)
+        (setq errors (cons
+              (list (string-to-number (match-string 1))
+                (mlint-column-output (match-string 2))
+                (match-string 4)
+                "" ; this was the warning code (level)
+                (match-string 3)
+                )
+              errors))))
+    )
       (mlint-clear-nested-function-info-overlays)
       (setq mlint-symtab-info symtab)
       (when (and highlight-cross-function-variables (integerp n))
@@ -247,7 +259,7 @@ If BUFFER is nil, use the current buffer."
             (let ((entry (aref mlint-symtab-info n)))
               (if entry
                   (let ((where (caddr entry)))
-                    (goto-line (car where))
+                    (mlint-goto-line (car where))
                     (forward-char (1- (cdr where)))
                     (re-search-backward "function\\b")
                     (setq where (point))
@@ -262,7 +274,7 @@ If BUFFER is nil, use the current buffer."
                          'cross-function-variables
                          (concat
                           "\\b\\("
-                          (mapconcat '(lambda (x) x) (cdddr entry) "\\|")
+                          (mapconcat #'(lambda (x) x) (cdddr entry) "\\|")
                           "\\)\\b")))))))))
       errors
       )))
@@ -273,40 +285,40 @@ If BUFFER is nil, use the current buffer."
 
 (defclass mlint-lm-entry (linemark-entry)
   ((column :initarg :column
-	   :type integer
-	   :documentation
-	   "The column on which the warning occurs.")
+       :type integer
+       :documentation
+       "The column on which the warning occurs.")
    (column-end :initarg :column-end
-	       :type integer
-	       :documentation
-	       "The column on which the warning ends.")
+           :type integer
+           :documentation
+           "The column on which the warning ends.")
    (coverlay :type linemark-overlay
-	     :documentation
-	     "Overlay used for the specific part of the line at issue.")
+         :documentation
+         "Overlay used for the specific part of the line at issue.")
    (warning :initarg :warning
-	   :type string
-	   :documentation
-	   "The error message created by mlint on this line.")
+       :type string
+       :documentation
+       "The error message created by mlint on this line.")
    (warningid :initarg :warningid
-	      :type symbol
-	      :documentation
-	      "The error id provided by mlint.
+          :type symbol
+          :documentation
+          "The error id provided by mlint.
 Warning ID's won't change between releases, unlike the warning messages.")
    (warningcode :initarg :warningcode
-		:type symbol
-		:initform 'minor
-		:documentation
-		"mlint return code for this type of warning.")
+        :type symbol
+        :initform 'minor
+        :documentation
+        "mlint return code for this type of warning.")
    (fixable-p :initform nil
-	      :allocation :class
-	      :type boolean
-	      :documentation
-	      "Can this class auto-fix the problem?")
+          :allocation :class
+          :type boolean
+          :documentation
+          "Can this class auto-fix the problem?")
    (fix-description :initform nil
-		    :allocation :class
-		    :type (or string null)
-		    :documentation
-		    "Description of how the fix will effect the buffer.")
+            :allocation :class
+            :type (or string null)
+            :documentation
+            "Description of how the fix will effect the buffer.")
    )
   "A linemark entry.")
 
@@ -314,15 +326,15 @@ Warning ID's won't change between releases, unlike the warning messages.")
   "Create a group object for tracking linemark entries.
 Do not permit multiple groups with the same name."
   (let* ((name "mlint")
-	 (newgroup (mlint-lm-group name :face 'linemark-go-face))
-	 (foundgroup nil)
-	 (lmg linemark-groups))
+     (newgroup (mlint-lm-group name :face 'linemark-go-face))
+     (foundgroup nil)
+     (lmg linemark-groups))
     (while (and (not foundgroup) lmg)
-      (if (string= name (object-name-string (car lmg)))
-	  (setq foundgroup (car lmg)))
+      (if (string= name (mlint-object-name-string (car lmg)))
+      (setq foundgroup (car lmg)))
       (setq lmg (cdr lmg)))
     (if foundgroup
-	(setq newgroup foundgroup)
+    (setq newgroup foundgroup)
       (setq linemark-groups (cons newgroup linemark-groups))
       newgroup)))
 
@@ -334,11 +346,11 @@ Do not permit multiple groups with the same name."
 Different warnings are handled by different classes."
   (if mlint-scan-for-fixes-flag
       (let ((al mlint-error-id-fix-alist))
-	(while (and al
-		    (not (eq (car (car al)) warningid))
-		    )
-	  (setq al (cdr al)))
-	(or (cdr (car al)) 'mlint-lm-entry))
+    (while (and al
+            (not (eq (car (car al)) warningid))
+            )
+      (setq al (cdr al)))
+    (or (cdr (car al)) 'mlint-lm-entry))
     'mlint-lm-entry))
 
 (defmethod linemark-new-entry ((g mlint-lm-group) &rest args)
@@ -346,10 +358,10 @@ Different warnings are handled by different classes."
 It will be at location FILE and LINE, and use optional FACE.
 Call the new entrie's activate method."
   (let* ((f (plist-get args :filename))
-	 (l (plist-get args :line))
-	 (wc (plist-get args :warningcode))
-	 (c (mlint-warningid->class (plist-get args :warningid)))
-	)
+     (l (plist-get args :line))
+     (wc (plist-get args :warningcode))
+     (c (mlint-warningid->class (plist-get args :warningid)))
+    )
     (when (stringp f) (setq f (file-name-nondirectory f)))
     (apply c (format "%s %d" f l) args)
     ))
@@ -357,10 +369,12 @@ Call the new entrie's activate method."
 (defun mlint-end-of-something ()
   "Move cursor to the end of whatever the cursor is on."
   (cond ((looking-at "\\w\\|\\s(")
-	 (forward-sexp 1))
-	((looking-at "\\s.")
-	 (skip-syntax-forward "."))
-	(t (error nil))))
+     (forward-sexp 1))
+    ((looking-at "\\s.")
+     (skip-syntax-forward "."))
+    (t (error nil))))
+
+(defvar mlint-overlay-map) ;; quiet compiler warning with forward declaration
 
 (defmethod linemark-display ((e mlint-lm-entry) active-p)
   "Set object E to be active."
@@ -368,56 +382,55 @@ Call the new entrie's activate method."
   ;; Fix the color here.
   (let ((wc (oref e warningcode)))
     (oset e :face
-	  (cond ((eq wc 'major) 'linemark-stop-face)
-		((eq wc 'medium) 'linemark-caution-face)
-		(t 'linemark-go-face))))
+      (cond ((eq wc 'major) 'linemark-stop-face)
+        ((eq wc 'medium) 'linemark-caution-face)
+        (t 'linemark-go-face))))
   ;; Call our parent method
   (call-next-method)
   ;; Add highlight area
   (if active-p
       (when (and (not (slot-boundp e 'coverlay))
-		 (slot-boundp e 'overlay)
-		 (oref e overlay))
-	(with-slots (overlay column column-end warning) e
-	  (let ((warntxt
-		 (if (mlint-is-fixable e)
-		     (concat warning "\nC-c , f to "
-			     (oref e fix-description))
-		   warning)))
-	    ;; We called super first, so this should be an active overlay.
-	    (linemark-overlay-put overlay 'local-map mlint-overlay-map)
-	    (linemark-overlay-put overlay 'help-echo warntxt)
-	    ;; Now, if we have some column data, lets put more highlighting on.
-	    (save-excursion
-	      (set-buffer (linemark-overlay-buffer overlay))
-	      (goto-char (linemark-overlay-start overlay))
-	      (condition-case nil
-		  (forward-char (1- column))
-		  ;;(move-to-column (1- column))
-		(error nil))
-	      (oset e coverlay (linemark-make-overlay
-				(point)
-				(progn
-				  (beginning-of-line)
-				  (forward-char column-end)
-				  ;(move-to-column column-end)
-				  (point))
-				(current-buffer)))
-	      (with-slots (coverlay) e
-		(linemark-overlay-put coverlay 'face 'linemark-funny-face)
-		(linemark-overlay-put coverlay 'obj e)
-		(linemark-overlay-put coverlay 'tag 'mlint)
-		(linemark-overlay-put coverlay 'help-echo warntxt)
-		)
-	      ))))
+         (slot-boundp e 'overlay)
+         (oref e overlay))
+    (with-slots (overlay column column-end warning) e
+      (let ((warntxt
+         (if (mlint-is-fixable e)
+             (concat warning "\nC-c , f to "
+                 (oref e fix-description))
+           warning)))
+        ;; We called super first, so this should be an active overlay.
+        (linemark-overlay-put overlay 'local-map mlint-overlay-map)
+        (linemark-overlay-put overlay 'help-echo warntxt)
+        ;; Now, if we have some column data, lets put more highlighting on.
+        (with-current-buffer (linemark-overlay-buffer overlay)
+          (goto-char (linemark-overlay-start overlay))
+          (condition-case nil
+          (forward-char (1- column))
+          ;;(move-to-column (1- column))
+        (error nil))
+          (oset e coverlay (linemark-make-overlay
+                (point)
+                (progn
+                  (beginning-of-line)
+                  (forward-char column-end)
+                  ;(move-to-column column-end)
+                  (point))
+                (current-buffer)))
+          (with-slots (coverlay) e
+        (linemark-overlay-put coverlay 'face 'linemark-funny-face)
+        (linemark-overlay-put coverlay 'obj e)
+        (linemark-overlay-put coverlay 'tag 'mlint)
+        (linemark-overlay-put coverlay 'help-echo warntxt)
+        )
+          ))))
     ;; Delete our spare overlay
     (when (slot-boundp e 'coverlay)
       (with-slots (coverlay) e
-	(when coverlay
-	  (condition-case nil
-	      (linemark-delete-overlay coverlay)
-	    (error nil))
-	  (slot-makeunbound e 'coverlay)))
+    (when coverlay
+      (condition-case nil
+          (linemark-delete-overlay coverlay)
+        (error nil))
+      (slot-makeunbound e 'coverlay)))
       )))
 
 (defmethod mlint-is-fixable ((e mlint-lm-entry))
@@ -447,10 +460,10 @@ Subclasses fulfill the duty of actually fixing the code."
 (defmethod mlint-fix-entry ((ent mlint-lm-delete-focus))
   "Add semi-colon to end of this line."
   (save-excursion
-    (goto-line (oref ent line))
+    (mlint-goto-line (oref ent line))
     (let* ((s (progn (move-to-column (1- (oref ent column))) (point)))
-	   (e (progn (move-to-column (oref ent column-end)) (point)))
-	   )
+       (e (progn (move-to-column (oref ent column-end)) (point)))
+       )
       (goto-char s)
       (delete-region (point) e)
       (point)
@@ -465,12 +478,12 @@ Subclasses fulfill the duty of actually fixing the code."
   :abstract t)
 
 (defmethod initialize-instance :AFTER ((this mlint-lm-replace-focus)
-				       &rest fields)
+                       &rest fields)
   "Calculate the new fix description for THIS.
 Optional argument FIELDS are the initialization arguments."
   ;; After basic initialization, update the fix description.
   (oset this fix-description (concat (oref mlint-lm-replace-focus fix-description)
-				     (oref this new-text))))
+                     (oref this new-text))))
 
 (defmethod mlint-fix-entry ((ent mlint-lm-replace-focus))
   "Replace the focus area with :new-text"
@@ -487,21 +500,21 @@ Optional argument FIELDS are the initialization arguments."
   ()
   "Entry for anything that is depricated.
 Extracts the replacement for the depricated symbol from the warning message.")
-   
+
 (defmethod initialize-instance :AFTER ((this mlint-lm-entry-depricated)
-				       &rest fields)
+                       &rest fields)
   "Calculate the 'new text' for THIS instance.
 Optional argument FIELDS are the initialization arguments."
   ;; After basic initialization, update the new text field.
   (let* ((warn (oref this warning))
-	 (junk (string-match "Use \\(\\w+\\) instead" warn))
-	 (newfcn (when junk (downcase (substring warn (match-beginning 1) (match-end 1))))))
+     (junk (string-match "Use \\(\\w+\\) instead" warn))
+     (newfcn (when junk (downcase (substring warn (match-beginning 1) (match-end 1))))))
     (oset this new-text newfcn)
     ;; After basic initialization, update the fix description.
     (oset this fix-description (concat (oref mlint-lm-replace-focus fix-description)
-				       newfcn))
+                       newfcn))
     ))
-  
+
 (defclass mlint-lm-entry-logicals (mlint-lm-entry)
   ((fixable-p :initform t)
    (fix-description :initform "perform a replacement.")
@@ -511,10 +524,10 @@ Optional argument FIELDS are the initialization arguments."
 (defmethod mlint-fix-entry ((ent mlint-lm-entry-logicals))
   "Replace the single logical with double logical."
   (save-excursion
-    (goto-line (oref ent line))
+    (mlint-goto-line (oref ent line))
     (let* ((s (progn (move-to-column (1- (oref ent column))) (point)))
-	   (e (progn (move-to-column (oref ent column-end)) (point)))
-	   (txt (buffer-substring-no-properties s e)))
+       (e (progn (move-to-column (oref ent column-end)) (point)))
+       (txt (buffer-substring-no-properties s e)))
       (goto-char s)
       ;; All of these are replacing single logicals with double.
       (insert txt)))
@@ -529,13 +542,13 @@ Optional argument FIELDS are the initialization arguments."
 (defmethod mlint-fix-entry ((ent mlint-lm-entry-unused-argument))
   "Remove the arguments."
   (save-excursion
-    (goto-line (oref ent line))
+    (mlint-goto-line (oref ent line))
     (let* ((s (progn (move-to-column (1- (oref ent column))) (point)))
-	   (e (progn (move-to-column (oref ent column-end)) (point)))
-	   )
+       (e (progn (move-to-column (oref ent column-end)) (point)))
+       )
       (goto-char s)
       (if (not (looking-at "(\\|,"))
-	  (forward-char -1))
+      (forward-char -1))
       (delete-region (point) e)
       ))
   )
@@ -558,31 +571,29 @@ Optional argument FIELDS are the initialization arguments."
 ;;
 (defun mlint-highlight (err)
   "Setup ERR, an mlint message to be marked."
-  (linemark-add-entry mlint-mark-group
-		      :line (nth 0 err)
-		      :column (car (nth 1 err))
-		      :column-end (cdr (nth 1 err))
-		      :warning (nth 2 err)
-		      ;; Old style did this lookup, but new versins of
-		      ;; MLint replace the warning code with a warning
-		      ;; ID which can instead be used for auto-fix.  In addition,
-		      ;; just use the default warning code.
-		      
-		      ;;:warningcode 'minor
-		      ;; (cdr (assoc (nth 3 err) mlint-warningcode-alist))
-		      :warningid (intern (nth 4 err))
-		      ))
+  (save-excursion
+    (linemark-add-entry mlint-mark-group
+                        :line (nth 0 err)
+                        :column (car (nth 1 err))
+                        :column-end (cdr (nth 1 err))
+                        :warning (nth 2 err)
+                        ;; Old style did this lookup, but new versins of
+                        ;; MLint replace the warning code with a warning
+                        ;; ID which can instead be used for auto-fix.  In addition,
+                        ;; just use the default warning code.
+
+                        ;;:warningcode 'minor
+                        ;; (cdr (assoc (nth 3 err) mlint-warningcode-alist))
+                        :warningid (intern (nth 4 err))
+                        )))
 
 (defun mlint-clear-warnings ()
   "Unhighlight all existing mlint warnings."
   (interactive)
-  (mapcar (lambda (e)
-	    (if (string= (oref e filename) (buffer-file-name))
-		(linemark-delete e)))
-	  (oref mlint-mark-group marks))
-  (if (and (boundp 'global-font-lock-mode) global-font-lock-mode
-	   (not font-lock-mode))
-      (font-lock-fontify-buffer)))
+  (mapc (lambda (e)
+          (if (string= (oref e filename) (buffer-file-name))
+              (linemark-delete e)))
+        (oref mlint-mark-group marks)))
 
 (defun mlint-clear-nested-function-info-overlays ()
   "Clear out any previous overlays with nested function information.
@@ -599,7 +610,7 @@ This includes nested-function and cross-function-variables."
 "Remove cross-function-variable overalys and re-fontify buffer."
   (mlint-clear-nested-function-info-overlays)
   (if (and (boundp 'global-font-lock-mode) global-font-lock-mode
-	   (not font-lock-mode))
+       (not font-lock-mode))
       (font-lock-fontify-buffer)))
 
 (defun mlint-buffer ()
@@ -607,24 +618,27 @@ This includes nested-function and cross-function-variables."
 Highlight problems and/or cross-function variables."
   (interactive)
   (when (and (buffer-file-name) mlint-program)
-    (if (and (buffer-modified-p)
-	     (y-or-n-p (format "Save %s before linting? "
-			       (file-name-nondirectory (buffer-file-name)))))
-	(save-buffer))
+    ;; If buffer-file-truename is nil, then it's not safe to save the
+    ;; buffer. magit pulls in the code into a buffer and saving during
+    ;; a magit ediff will result in backing out changes.
+    (if (and buffer-file-truename (buffer-modified-p)
+             (y-or-n-p (format "Save %s before linting? "
+                               (file-name-nondirectory (buffer-file-name)))))
+        (save-buffer))
     (let ((errs (mlint-run))
-	  )
+          )
       (mlint-clear-warnings)
       (while errs
-	(mlint-highlight (car errs))
-	(setq errs (cdr errs))))))
+        (mlint-highlight (car errs))
+        (setq errs (cdr errs))))))
 
 (defun mlint-next-buffer ()
   "Move to the next warning in this buffer."
   (interactive)
   (let ((n (linemark-next-in-buffer mlint-mark-group 1 t)))
     (if n
-	(progn (goto-line (oref n line))
-	       (message (oref n warning)))
+        (progn (mlint-goto-line (oref n line))
+               (message (oref n warning)))
       (ding))))
 
 (defun mlint-prev-buffer ()
@@ -632,40 +646,40 @@ Highlight problems and/or cross-function variables."
   (interactive)
   (let ((n (linemark-next-in-buffer mlint-mark-group -1 t)))
     (if n
-	(progn (goto-line (oref n line))
-	       (message (oref n warning)))
+        (progn (mlint-goto-line (oref n line))
+               (message (oref n warning)))
       (ding))))
 
 (defun mlint-next-buffer-new ()
   "Move to the next new warning in this buffer."
   (interactive)
   (let ((p (linemark-at-point (point) mlint-mark-group))
-	(n (linemark-next-in-buffer mlint-mark-group 1 t)))
+        (n (linemark-next-in-buffer mlint-mark-group 1 t)))
     ;; Skip over messages that are the same as the one under point.
     (save-excursion
       (while (and n p (not (eq n p))
-		  (string= (oref p warning) (oref n warning)))
-	(goto-line (oref n line))
-	(setq n (linemark-next-in-buffer mlint-mark-group 1 t))))
+                  (string= (oref p warning) (oref n warning)))
+        (mlint-goto-line (oref n line))
+        (setq n (linemark-next-in-buffer mlint-mark-group 1 t))))
     (if n
-	(progn (goto-line (oref n line))
-	       (message (oref n warning)))
+        (progn (mlint-goto-line (oref n line))
+               (message (oref n warning)))
       (ding))))
 
 (defun mlint-prev-buffer-new ()
   "Move to the prev new warning in this buffer."
   (interactive)
   (let ((p (linemark-at-point (point) mlint-mark-group))
-	(n (linemark-next-in-buffer mlint-mark-group -1 t)))
+        (n (linemark-next-in-buffer mlint-mark-group -1 t)))
     ;; Skip over messages that are the same as the one under point.
     (save-excursion
       (while (and n p (not (eq n p))
-		  (string= (oref p warning) (oref n warning)))
-	(goto-line (oref n line))
-	(setq n (linemark-next-in-buffer mlint-mark-group -1 t))))
+                  (string= (oref p warning) (oref n warning)))
+        (mlint-goto-line (oref n line))
+        (setq n (linemark-next-in-buffer mlint-mark-group -1 t))))
     (if n
-	(progn (goto-line (oref n line))
-	       (message (oref n warning)))
+        (progn (mlint-goto-line (oref n line))
+               (message (oref n warning)))
       (ding))))
 
 (defun mlint-show-warning ()
@@ -673,7 +687,7 @@ Highlight problems and/or cross-function variables."
   (interactive)
   (let ((n (linemark-at-point (point) mlint-mark-group)))
     (if (not n)
-	(message "No warning at point.")
+        (message "No warning at point.")
       (message (oref n warning)))))
 
 (defun mlint-fix-warning ()
@@ -681,22 +695,22 @@ Highlight problems and/or cross-function variables."
   (interactive)
   (let ((n (linemark-at-point (point) mlint-mark-group)))
     (if (not n)
-	(message "No warning at point.")
+    (message "No warning at point.")
       (if (not (mlint-is-fixable n))
-	  (message "No method for fixing this warning.")
-	(mlint-fix-entry n)))))
+      (message "No method for fixing this warning.")
+    (mlint-fix-entry n)))))
 
 (defun mlint-mark-ok ()
   "Mark this line as M-Lint Ok."
   (interactive)
   (let ((n (linemark-at-point (point) mlint-mark-group)))
     (if (not n)
-	(message "No warning at point.")
+    (message "No warning at point.")
       (let ((col (matlab-comment-on-line)))
-	(or col (end-of-line))
-	(insert " %#ok")
-	;; Add spaces if there was a comment.
-	(when col (insert "  ")))
+    (or col (end-of-line))
+    (insert " %#ok")
+    ;; Add spaces if there was a comment.
+    (when col (insert "  ")))
       ;; This causes inconsistencies.
       ;; (linemark-delete n)
       ))
@@ -756,9 +770,9 @@ Highlight problems and/or cross-function variables."
 Must be bound to event E."
   (interactive "e")
   (let ((repos nil)
-	(ipos nil)
-	(startpos (point))
-	)
+    (ipos nil)
+    (startpos (point))
+    )
     (save-excursion
       (mouse-set-point e)
       (setq ipos (point))
@@ -775,15 +789,15 @@ With prefix ARG, turn mlint minor mode on iff ARG is positive.
   nil " mlint" mlint-minor-mode-map
   (if (and mlint-minor-mode (not (eq major-mode 'matlab-mode)))
       (progn
-	(mlint-minor-mode -1)
-	(error "M-Lint minor mode is only for MATLAB Major mode")))
+    (mlint-minor-mode -1)
+    (error "M-Lint minor mode is only for MATLAB Major mode")))
   (if (not mlint-minor-mode)
       (progn
         (mlint-clear-nested-function-info-overlays)
-	(mlint-clear-warnings)
-	(remove-hook 'after-save-hook 'mlint-buffer t)
-	(easy-menu-remove mlint-minor-menu)
-	)
+    (mlint-clear-warnings)
+    (remove-hook 'after-save-hook 'mlint-buffer t)
+    (easy-menu-remove mlint-minor-menu)
+    )
     (when mlint-program-selection-fcn
       (let ((ans (funcall mlint-program-selection-fcn))
             )
@@ -794,8 +808,8 @@ With prefix ARG, turn mlint minor mode on iff ARG is positive.
         )
       )
     (if (not mlint-program)
-	(if (y-or-n-p "No MLINT program available.  Configure it?")
-	    (customize-variable 'mlint-programs))
+    (if (y-or-n-p "No MLINT program available.  Configure it?")
+        (customize-variable 'mlint-programs))
 
       (add-hook 'after-save-hook 'mlint-buffer nil t)
       (easy-menu-add mlint-minor-menu mlint-minor-mode-map)
@@ -810,7 +824,7 @@ With prefix ARG, turn mlint minor mode on iff ARG is positive.
   "Hook run when EDiff is about to do stuff to a buffer.
 That buffer will be current."
   (when (and (eq major-mode 'matlab-mode)
-	     mlint-minor-mode)
+         mlint-minor-mode)
     (setq mlint-minor-mode-was-enabled-before mlint-minor-mode)
     (mlint-minor-mode -1)
     ))
@@ -822,15 +836,13 @@ That buffer will be current."
 The buffer that was originally \"setup\" is not current, so we need to
 find it."
   (mapcar (lambda (b)
-	    (when (save-excursion
-		    (set-buffer b)
-		    (and (eq major-mode 'matlab-mode)
-			 mlint-minor-mode-was-enabled-before))
-	      (save-excursion
-		(set-buffer b)
-		(mlint-minor-mode 1)
-		(setq mlint-minor-mode-was-enabled-before nil))))
-	  (buffer-list)))
+            (when (with-current-buffer b
+                    (and (eq major-mode 'matlab-mode)
+                         mlint-minor-mode-was-enabled-before))
+              (with-current-buffer b
+                (mlint-minor-mode 1)
+                (setq mlint-minor-mode-was-enabled-before nil))))
+          (buffer-list)))
 
 (add-hook 'ediff-cleanup-hook 'mlint-ediff-cleanup-hook)
 

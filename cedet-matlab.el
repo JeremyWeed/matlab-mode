@@ -24,6 +24,8 @@
 ;;
 ;; Setup miscelaneous CEDET tools to work with MATLAB.
 
+(defvar srecode-map-load-path) ;; quite compiler warning
+
 ;;; Code:
 ;;;###autoload
 (defun matlab-cedet-setup ()
@@ -38,23 +40,22 @@
 
   ;; Setup Semantic Recoder (Template support for MATLAB and TLC.):
   (let* ((lib (locate-library "matlab.el" t))
-	 (ededir (file-name-directory lib))
-	 (tmpdir (file-name-as-directory
-		  (expand-file-name "templates" ededir))))
+         (ededir (file-name-directory lib))
+         (tmpdir (file-name-as-directory
+                  (expand-file-name "templates" ededir))))
     (when (not tmpdir)
       (error "Unable to locate MATLAB Templates directory"))
 
     ;; Rig up the map.
     (condition-case nil
-	(require 'srecode-map)
+        (require 'srecode-map)
       (error (require 'srecode/map)))
 
     (add-to-list 'srecode-map-load-path tmpdir)
-    (srecode-map-update-map t)
-    )
-
-  
-  )
+    (if (fboundp 'srecode-map-update-map)
+        (srecode-map-update-map t)
+      (error "srecode-map-update-map not found"))
+    ))
 
 
 (provide 'cedet-matlab)
